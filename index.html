@@ -132,6 +132,7 @@
 
     <div class="btns full-row">
       <button id="btnAnnual" type="button">Calculate Annual PV + Thermal</button>
+      <span id="calcHint" style="display:none;margin-left:10px;font-size:12px;color:#666;line-height:2.5;">⏳ This might take a few minutes.</span>
     </div>
   </div>  <!-- 关闭 <div class="grid"> -->
 
@@ -515,6 +516,7 @@
       // ===== MAIN CALCULATION =====
       async function calcAnnualPVT() {
         try {
+          document.getElementById("calcHint").style.display = "inline";  
           const tiltAngle = parseFloat(document.getElementById("tiltAngle").value);
           const azimuthAngle = parseFloat(document.getElementById("azimuthAngle").value);
           const albedo = parseFloat(document.getElementById("albedo").value);
@@ -592,6 +594,7 @@
           }
 
           setOutput(html);
+          document.getElementById("calcHint").style.display = "none"; 
 
           const BASE_YEAR_FOR_TABLES = new Date().getFullYear() - 1;
           const timeSeries = [];
@@ -637,6 +640,7 @@
         } catch (err) {
           console.error(err);
           setOutput(`Error: ${err.message}`, true);
+          document.getElementById("calcHint").style.display = "none";  
         }
       }
 
