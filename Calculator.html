@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Annual PVT Calculator</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:18px;color:#111;}
+    .wrap{max-width:980px;}
+    h1{font-size:20px;margin:0 0 10px;}
+    .panel{padding:12px;border:1px solid #ddd;background:#fafafa;border-radius:8px;}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;align-items:center;}
+    label{font-size:13px;}
+    input,select{width:100%;padding:8px;box-sizing:border-box;}
+    .btns{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0;}
+    button{padding:10px 12px;cursor:pointer;}
+    .note{font-size:12px;color:#444;line-height:1.4;}
+    #output{margin-top:12px;}
+    .err{color:#b00020;}
+    .ok{color:#0b6b2d;}
+    .full-row { grid-column: 1 / -1; }
+    #downloadLink{display:none;margin-top:10px;}
+    @media (max-width:780px){.grid{grid-template-columns:1fr;}}
+    #processChecks{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;}
+    .process-check{margin:0;font-size:13px;}
+    .process-check label{display:grid;grid-template-columns:18px 1fr;align-items:start;column-gap:8px;cursor:pointer;}
+    .process-check input[type=checkbox]{width:auto;margin:2px 0 0 0;}
+    .result-table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px;}
+    .result-table th,.result-table td{padding:6px 10px;text-align:left;border-bottom:1px solid #ddd;}
+    .result-table th{background:#f5f5f5;font-weight:600;}
+    .result-table td.num{text-align:right;font-family:monospace;}
+    .chart-container{position:relative;height:400px;margin:16px 0;}
+    .data-table-container{margin-top:20px;}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+<div class="wrap">
+  <h1>Annual PVT Calculator</h1>
+
+  <div class="panel">
+    <div class="grid">
+      <label for="addressInput"><b>Address:</b></label>
+      <div>
+        <input id="addressInput" type="text" placeholder="e.g. 1 George St, Sydney NSW, Australia" />
+        <div class="btns" style="margin:8px 0 0;">
+          <button id="btnLoadTMY" type="button">Geocode & Load TMY</button>
+        </div>
+        <div id="locConfirm" class="note" style="margin-top:6px;"></div>
+      </div>
+
+      <label for="tiltAngle">Tilt Angle (deg):</label>
+      <input id="tiltAngle" type="number" step="0.01" value="30" />
+
+      <label for="azimuthAngle">Surface Azimuth Angle (deg):</label>
+      <input id="azimuthAngle" type="number" step="0.01" value="0" />
+
+      <label for="albedo">Ground Albedo (0-1):</label>
+      <input id="albedo" type="number" min="0" max="1" step="0.01" value="0.2" />
+
+      <label for="area">Collector / PV Area A (m²):</label>
+      <input id="area" type="number" min="0" step="0.01" value="1.0" />
+
+      <label for="flowRate">Flow Rate (L/s/m²):</label>
+      <input id="flowRate" type="number" min="0" step="0.001" value="0.02" />
+
+      <label for="etaPv">PV efficiency η (0–1):</label>
+      <input id="etaPv" type="number" min="0" max="1" step="0.01" value="0.20" />
+
+      <label for="tin">Inlet temperature Tin (°C):</label>
+      <input id="tin" type="number" step="0.1" value="10" />
+
+      <div class="hint full-row" style="margin:8px 0 4px;font-size:12px;color:#555;line-height:1.4;">
+        <b>PVT Thermal Efficiency Model:</b>
+        <code>η_th = a0 + a1 * ((Tin - Ta) / G) + a2 * v_wind</code>
+      </div>
+
+      <label for="pvtA0">PVT a0:</label>
+      <input id="pvtA0" type="number" step="0.000000001" value="0.279952866" />
+
+      <label for="pvtA1">PVT a1:</label>
+      <input id="pvtA1" type="number" step="0.000000001" value="-10.52839866" />
+
+      <label for="pvtA2">PVT a2:</label>
+      <input id="pvtA2" type="number" step="0.000000001" value="-0.008135537" />
+
+      <div class="full-row" style="border-top:1px solid #ddd;margin:12px 0 6px;padding-top:10px;">
+        <b style="font-size:14px;">Industry Thermal Demand (optional)</b>
+      </div>
+
+      <label for="industrySelect"><b>Industry:</b></label>
+      <select id="industrySelect">
+        <option value="">— None (PVT supply only) —</option>
+        <option value="dairy_farm">Dairy Farm</option>
+        <option value="brewery">Brewery</option>
+        <option value="hotel">Hotel</option>
+        <option value="commercial_laundry">Commercial Laundry</option>
+      </select>
+
+      <label for="throughputInput" id="throughputLabel" style="display:none;">Throughput (L/year):</label>
+      <input id="throughputInput" type="number" min="0" step="1" value="0" style="display:none;" />
+
+      <div id="pvt-data-table" class="full-row" style="border-top:1px solid #ddd;padding:12px 0 24px;margin-top:16px;">
+        <h4>Monthly Data (Charts & Tables)</h4>
+        <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
+        <div id="monthlyDataTable" class="data-table-container"></div>
+
+        <div style="margin:16px 0;">
+          <label for="monthSelector">Select month for daily details:</label>
+          <select id="monthSelector" style="padding:8px;margin-left:8px;">
+            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+          </select>
+        </div>
+
+        <div class="chart-container"><canvas id="dailyChart"></canvas></div>
+        <div id="dailyDataTable" class="data-table-container"></div>
+
+        <div class="chart-container"><canvas id="temperatureChart"></canvas></div>
+        <div id="temperatureDataTable" class="data-table-container"></div>
+      </div>
+
+      <div id="processPanel" class="full-row" style="display:none;">
+        <div style="margin:8px 0;padding:10px;background:#f0f4f8;border-radius:6px;border:1px solid #cce;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Select thermal processes:</div>
+          <div id="processChecks"></div>
+        </div>
+      </div>
+
+      <div id="profilePanel" class="full-row" style="display:none;">
+        <div style="margin:8px 0;padding:10px;background:#f8f8f8;border-radius:6px;border:1px solid #ddd;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Operating profile:</div>
+          <label for="profileType" style="display:block;margin-bottom:6px;">Profile type:</label>
+          <select id="profileType" style="margin-bottom:10px;">
+            <option value="flat">Flat annual demand</option>
+            <option value="day_5">9–5, 5 day week</option>
+            <option value="continuous">24/7 continuous</option>
+          </select>
+          <label for="rampUp" style="display:block;margin-bottom:6px;">Startup ramp-up:</label>
+          <select id="rampUp">
+            <option value="none">None</option>
+            <option value="1h">1 hour</option>
+            <option value="2h">2 hours</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btns full-row">
+        <button id="btnAnnual" type="button">Calculate Annual PV + Thermal</button>
+        <a id="downloadLink" href="#" target="_blank" rel="noopener">Download hourly details CSV</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="output" class="panel">Ready.</div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+      let CURRENT_LOC = null, CURRENT_MET = null, CURRENT_TZ = null;
+      let monthlyChartInstance = null, dailyChartInstance = null, temperatureChartInstance = null;
+
+      const setOutput = (html, isError=false) => document.getElementById("output").innerHTML = isError ? `<span class="err">${html}</span>` : html;
+      const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+      const isFiniteNumber = x => typeof x === "number" && Number.isFinite(x);
+
+      // ===== TABLE RENDERING =====
+      function renderMonthlyAllTable(monthlyData) {
+        const container = document.getElementById("monthlyDataTable");
+        if (!monthlyData?.length) { container.innerHTML = ""; return; }
+        let html = `<table class="result-table"><tr><th>Month</th><th style="text-align:right;">PV (kWh)</th><th style="text-align:right;">Thermal (kWh)</th><th style="text-align:right;">Avg Tout (°C)</th></tr>`;
+        monthlyData.forEach(row => {
+          if (row.month === 0) return;
+          const monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          html += `<tr><td>${monthNames[row.month]}</td><td class="num">${row.pv_kWh.toFixed(1)}</td><td class="num">${row.th_kWh.toFixed(1)}</td><td class="num">${row.Tout_C_avg > 0 ? row.Tout_C_avg.toFixed(1) : '—'}</td></tr>`;
+        });
+        container.innerHTML = html + `</table>`;
+      }
+
+      function renderDailyAllTable(dailyData) {
+        const container = document.getElementById("dailyDataTable");
+        if (!dailyData?.length) { container.innerHTML = ""; return; }
+        let html = `<table class="result-table"><tr><th>Date</th><th style="text-align:right;">PV (kWh)</th><th style="text-align:right;">Thermal (kWh)</th><th style="text-align:right;">Avg Tout (°C)</th></tr>`;
+        dailyData.forEach(row => {
+          html += `<tr><td>${row.date}</td><td class="num">${row.pv_kWh.toFixed(2)}</td><td class="num">${row.th_kWh.toFixed(2)}</td><td class="num">${row.Tout_C_avg > 0 ? row.Tout_C_avg.toFixed(1) : '—'}</td></tr>`;
+        });
+        container.innerHTML = html + `</table>`;
+      }
+
+      function renderTemperatureTable(monthlyData) {
+        const container = document.getElementById("temperatureDataTable");
+        if (!monthlyData?.length) { container.innerHTML = ""; return; }
+        let html = `<table class="result-table"><tr><th>Month</th><th style="text-align:right;">Avg Tout (°C)</th></tr>`;
+        monthlyData.forEach(row => {
+          if (row.month === 0) return;
+          const monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          html += `<tr><td>${monthNames[row.month]}</td><td class="num">${row.Tout_C_avg > 0 ? row.Tout_C_avg.toFixed(1) : '—'}</td></tr>`;
+        });
+        container.innerHTML = html + `</table>`;
+      }
+
+      // ===== CHART RENDERING =====
+      function renderMonthlyChart(monthlyData) {
+        const labels = [], pvData = [], thData = [];
+        monthlyData.forEach(row => {
+          if (row.month === 0) return;
+          const monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          labels.push(monthNames[row.month]);
+          pvData.push(row.pv_kWh.toFixed(1));
+          thData.push(row.th_kWh.toFixed(1));
+        });
+        const ctx = document.getElementById('monthlyChart');
+        if (!ctx) return;
+        if (monthlyChartInstance) monthlyChartInstance.destroy();
+        monthlyChartInstance = new Chart(ctx.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'PV Energy (kWh)', data: pvData, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderColor: 'rgba(255, 193, 7, 1)', borderWidth: 1 },
+              { label: 'Thermal Energy (kWh)', data: thData, backgroundColor: 'rgba(233, 30, 99, 0.7)', borderColor: 'rgba(233, 30, 99, 1)', borderWidth: 1 }
+            ]
+          },
+          options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { title: { display: true, text: 'Monthly PV & Thermal Energy' } } }
+        });
+      }
+
+      function renderDailyChart(dailyData) {
+        const labels = [], pvData = [], thData = [];
+        dailyData.forEach(row => {
+          labels.push(row.date.split('-')[2]);
+          pvData.push(row.pv_kWh.toFixed(2));
+          thData.push(row.th_kWh.toFixed(2));
+        });
+        const ctx = document.getElementById('dailyChart');
+        if (!ctx) return;
+        if (dailyChartInstance) dailyChartInstance.destroy();
+        dailyChartInstance = new Chart(ctx.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'PV Energy (kWh)', data: pvData, backgroundColor: 'rgba(255, 193, 7, 0.7)', borderColor: 'rgba(255, 193, 7, 1)', borderWidth: 1 },
+              { label: 'Thermal Energy (kWh)', data: thData, backgroundColor: 'rgba(233, 30, 99, 0.7)', borderColor: 'rgba(233, 30, 99, 1)', borderWidth: 1 }
+            ]
+          },
+          options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { title: { display: true, text: 'Daily PV & Thermal Energy' } } }
+        });
+      }
+
+      function renderTemperatureChartJS(monthlyData) {
+        const labels = [], toutData = [];
+        monthlyData.forEach(row => {
+          if (row.month === 0) return;
+          const monthNames = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          labels.push(monthNames[row.month]);
+          toutData.push(row.Tout_C_avg > 0 ? row.Tout_C_avg.toFixed(1) : 0);
+        });
+        const ctx = document.getElementById('temperatureChart');
+        if (!ctx) return;
+        if (temperatureChartInstance) temperatureChartInstance.destroy();
+        temperatureChartInstance = new Chart(ctx.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [ { label: 'Average Outlet Temperature (°C)', data: toutData, borderColor: 'rgba(76, 175, 80, 1)', backgroundColor: 'rgba(76, 175, 80, 0.1)', borderWidth: 2, fill: true, tension: 0.4 } ]
+          },
+          options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { title: { display: true, text: 'Monthly Average Outlet Temperature' } } }
+        });
+      }
+
+      // ===== DATA AGGREGATION =====
+      function aggregateMonthlyAll(series, year) {
+        const months = Array.from({ length: 12 }, () => ({ month: 0, year, pv_kWh: 0, th_kWh: 0, Tout_C_sum: 0, Tout_C_count: 0, Tout_C_avg: 0 }));
+        series.forEach(r => {
+          if (!r.date) return;
+          const d = new Date(r.date);
+          if (d.getFullYear() === year) {
+            const m = d.getMonth();
+            months[m].month = m + 1;
+            months[m].pv_kWh += Number(r.pv_kWh) || 0;
+            months[m].th_kWh += Number(r.th_kWh) || 0;
+            if (Number(r.Tout_C) > 0) { months[m].Tout_C_sum += Number(r.Tout_C); months[m].Tout_C_count += 1; }
+          }
+        });
+        months.forEach(m => m.Tout_C_avg = m.Tout_C_count > 0 ? m.Tout_C_sum / m.Tout_C_count : 0);
+        return months;
+      }
+
+      function aggregateDailyAll(series, year, month) {
+        const days = new Date(year, month, 0).getDate();
+        const daysArr = Array.from({ length: days }, (_, i) => ({
+          date: `${year}-${String(month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`,
+          pv_kWh: 0, th_kWh: 0, Tout_C_sum: 0, Tout_C_count: 0, Tout_C_avg: 0
+        }));
+        series.forEach(r => {
+          if (!r.date) return;
+          const d = new Date(r.date);
+          if (d.getFullYear() === year && (d.getMonth() + 1) === month) {
+            const day = d.getDate();
+            daysArr[day - 1].pv_kWh += Number(r.pv_kWh) || 0;
+            daysArr[day - 1].th_kWh += Number(r.th_kWh) || 0;
+            if (Number(r.Tout_C) > 0) { daysArr[day - 1].Tout_C_sum += Number(r.Tout_C); daysArr[day - 1].Tout_C_count += 1; }
+          }
+        });
+        daysArr.forEach(d => d.Tout_C_avg = d.Tout_C_count > 0 ? d.Tout_C_sum / d.Tout_C_count : 0);
+        return daysArr;
+      }
+
+      // ===== SOLAR RADIATION CLASS =====
+      class TiltedSurfaceRadiation {
+        constructor(latitude, longitude, tiltAngle, surfaceAzimuth, albedo = 0.2) {
+          this.latitude = latitude; this.longitude = longitude; this.tiltAngle = tiltAngle;
+          this.surfaceAzimuth = surfaceAzimuth; this.albedo = albedo;
+        }
+        toRadians(deg) { return deg * (Math.PI / 180); }
+        toDegrees(rad) { return rad * (180 / Math.PI); }
+        declinationAngle(dayN) { return 23.45 * Math.sin(this.toRadians((360 / 365) * (dayN + 284))); }
+        hourAngle(hourN) { return 15 * (hourN - 12); }
+        zenithAngle(dayN, hourN) {
+          const deltaRad = this.toRadians(this.declinationAngle(dayN));
+          const omegaRad = this.toRadians(this.hourAngle(hourN));
+          const latRad = this.toRadians(this.latitude);
+          const cosThetaZ = Math.sin(deltaRad) * Math.sin(latRad) + Math.cos(deltaRad) * Math.cos(latRad) * Math.cos(omegaRad);
+          return this.toDegrees(Math.acos(Math.min(1, Math.max(-1, cosThetaZ))));
+        }
+        incidenceAngle(dayN, hourN) {
+          const deltaRad = this.toRadians(this.declinationAngle(dayN));
+          const omegaRad = this.toRadians(this.hourAngle(hourN));
+          const latRad = this.toRadians(this.latitude);
+          const sRad = this.toRadians(this.tiltAngle);
+          const gammaRad = this.toRadians(this.surfaceAzimuth);
+          const item1 = Math.sin(deltaRad) * Math.sin(latRad) * Math.cos(sRad);
+          const item2 = Math.sin(deltaRad) * Math.cos(latRad) * Math.sin(sRad) * Math.cos(gammaRad);
+          const item3 = Math.cos(deltaRad) * Math.cos(latRad) * Math.cos(sRad) * Math.cos(omegaRad);
+          const item4 = Math.cos(deltaRad) * Math.sin(latRad) * Math.sin(sRad) * Math.cos(gammaRad) * Math.cos(omegaRad);
+          const item5 = Math.cos(deltaRad) * Math.sin(sRad) * Math.sin(gammaRad) * Math.sin(omegaRad);
+          const cosThetaT = item1 - item2 + item3 + item4 + item5;
+          return this.toDegrees(Math.acos(Math.min(1, Math.max(-1, cosThetaT))));
+        }
+        calculate(dayN, hourN, dni, dhi) {
+          const thetaZ = this.zenithAngle(dayN, hourN);
+          const cosThetaZ = Math.cos(this.toRadians(thetaZ));
+          const eps = 1e-6;
+          const DNI = Math.max(0, (dni || 0));
+          const DHI = Math.max(0, (dhi || 0));
+          const BHI = (cosThetaZ > eps) ? (DNI * Math.max(0, cosThetaZ)) : 0;
+          const ghi = BHI + DHI;
+          const thetaT = this.incidenceAngle(dayN, hourN);
+          const cosThetaT = Math.cos(this.toRadians(thetaT));
+          const beamComponent = (cosThetaZ > eps) ? (DNI * Math.max(0, cosThetaT)) : 0;
+          const diffuseComponent = DHI * ((1 + Math.cos(this.toRadians(this.tiltAngle))) / 2);
+          const groundReflectedComponent = ghi * this.albedo * ((1 - Math.cos(this.toRadians(this.tiltAngle))) / 2);
+          const totalIrradiance = Math.max(0, beamComponent + diffuseComponent + groundReflectedComponent);
+          return { totalIrradiance, ghi, dni: DNI, bhi: BHI };
+        }
+      }
+
+      // ===== GEOCODING =====
+      async function geocodeAddress(address) {
+        const q = (address || "").trim();
+        if (!q) throw new Error("Please input an address.");
+        const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q);
+        const resp = await fetch(url, { headers: { "Accept": "application/json" } });
+        if (!resp.ok) throw new Error("Geocoding failed: " + resp.status);
+        const arr = await resp.json();
+        if (!Array.isArray(arr) || !arr.length) throw new Error("No geocoding result for this address.");
+        return { lat: parseFloat(arr[0].lat), lon: parseFloat(arr[0].lon), name: arr[0].display_name || q };
+      }
+
+      async function fetchTimezone(lat, lon) {
+        try {
+          const url = `https://timeapi.io/api/TimeZone/Coordinate?latitude=${lat}&longitude=${lon}`;
+          const resp = await fetch(url, { headers: { "Accept": "application/json" } });
+          if (!resp.ok) throw new Error("Timezone fetch failed: " + resp.status);
+          return await resp.json();
+        } catch (e) { console.warn("Could not fetch timezone:", e); return null; }
+      }
+
+      const TMY_ENDPOINTS = ["http://localhost:8000/tmy", "https://pvt-tmy-api.onrender.com/tmy"];
+
+      async function fetchTMY(lat, lon) {
+        const tzName = (CURRENT_TZ && CURRENT_TZ.timeZone) ? CURRENT_TZ.timeZone : "";
+        const gmtOffset = (CURRENT_TZ && Number.isFinite(CURRENT_TZ.gmtOffset)) ? CURRENT_TZ.gmtOffset : "";
+        const tzParams = tzName ? `&tzName=${encodeURIComponent(tzName)}` : "";
+        const offsetParams = (typeof gmtOffset === "number" && isFinite(gmtOffset)) ? `&gmtOffset=${gmtOffset}` : "";
+        const query = `?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}${tzParams}${offsetParams}`;
+        for (const base of TMY_ENDPOINTS) {
+          try {
+            const resp = await fetch(base + query, { headers: { "Accept": "application/json" } });
+            if (!resp.ok) continue;
+            console.log("TMY served by:", base);
+            return await resp.json();
+          } catch (e) { console.warn(`TMY endpoint ${base} unreachable:`, e.message); }
+        }
+        throw new Error("TMY fetch failed: all endpoints unreachable");
+      }
+
+      function normalizeWeatherRecords(raw) {
+        let arr;
+        if (Array.isArray(raw)) arr = raw;
+        else if (raw?.records) arr = raw.records;
+        else if (raw && typeof raw === "object") arr = Object.values(raw);
+        else throw new Error("Unsupported weather data structure.");
+        const out = [];
+        for (const r of arr) {
+          if (!r || typeof r !== "object") continue;
+          const dayN = +(r.dayN ?? r.dayn ?? r.DayN ?? r.DAYN);
+          let hourN = +(r.hourN ?? r.hourn ?? r.HourN ?? r.HOURN);
+          const dni = +(r.DNI ?? r.dni ?? r.Dni);
+          const dhi = +(r.DHI ?? r.dhi ?? r.Dhi);
+          const ta = +(r.Ta ?? r.ta ?? r.TA);
+          const vwind = +(r.Vwind ?? r.vwind ?? r.VWIND ?? r.VWind);
+          if (Number.isFinite(hourN) && hourN >= 1 && hourN <= 24) hourN = hourN - 1;
+          out.push({ dayN, hourN, dni, dhi, ta, vwind });
+        }
+        return out;
+      }
+
+      async function loadTMYByAddress() {
+        const addr = document.getElementById("addressInput").value;
+        setOutput("Geocoding & loading TMY...");
+        const loc = await geocodeAddress(addr);
+        const tzInfo = await fetchTimezone(loc.lat, loc.lon);
+        CURRENT_TZ = tzInfo;
+        const tzDisplay = tzInfo?.timeZone ? `${tzInfo.timeZone} (GMT offset ${tzInfo.gmtOffset ?? ""})` : "unknown";
+        document.getElementById("locConfirm").textContent = `Location: ${loc.name} (lat=${loc.lat.toFixed(6)}, lon=${loc.lon.toFixed(6)}), Timezone: ${tzDisplay}`;
+        const raw = await fetchTMY(loc.lat, loc.lon);
+        const met = normalizeWeatherRecords(raw);
+        CURRENT_LOC = loc;
+        CURRENT_MET = met;
+        setOutput("TMY loaded. Now click Calculate Annual PV + Thermal.");
+      }
+
+      // ===== INDUSTRY =====
+      const INDUSTRY_PROCESSES = {
+        dairy_farm: { post_milking_rinse: { label: "Post-milking warm rinse" }, cip_prerinse: { label: "CIP pre-rinse" }, boiler_preheat: { label: "Boiler feed water preheat" } },
+        brewery: { cip_prerinse: { label: "CIP pre-rinse" }, boiler_preheat: { label: "Boiler feed water preheat" } },
+        hotel: { domestic_hot_water: { label: "Domestic hot water (showers/basins)" }, laundry: { label: "Laundry" }, kitchen: { label: "Kitchen/dishwashing" }, pool_heating: { label: "Pool heating (optional)" } },
+        commercial_laundry: { wash_water: { label: "Wash water heating" }, rinse_preheat: { label: "Rinse water preheat" }, boiler_preheat: { label: "Steam/boiler preheat" } }
+      };
+
+      const INDUSTRY_UI = {
+        dairy_farm: { name: "Dairy Farm", throughput: "Raw milk throughput (L/year):", defaultVal: 5000000 },
+        brewery: { name: "Brewery", throughput: "Beer produced (L/year):", defaultVal: 500000 },
+        hotel: { name: "Hotel", throughput: "Occupied room-nights per year:", defaultVal: 50000 },
+        commercial_laundry: { name: "Commercial Laundry", throughput: "Laundry processed (kg/year):", defaultVal: 500000 }
+      };
+
+      function showProcessCheckboxes(industryKey) {
+        const panel = document.getElementById("processPanel");
+        const profilePanel = document.getElementById("profilePanel");
+        const container = document.getElementById("processChecks");
+        const throughputInput = document.getElementById("throughputInput");
+        const throughputLabel = document.getElementById("throughputLabel");
+        container.innerHTML = "";
+
+        const processes = INDUSTRY_PROCESSES[industryKey];
+        if (!processes) {
+          panel.style.display = "none";
+          profilePanel.style.display = "none";
+          throughputInput.style.display = "none";
+          throughputLabel.style.display = "none";
+          return;
+        }
+
+        for (const [key, proc] of Object.entries(processes)) {
+          const div = document.createElement("div");
+          div.className = "process-check";
+          div.innerHTML = `<label><input type="checkbox" value="${key}" checked /><span>${proc.label}</span></label>`;
+          container.appendChild(div);
+        }
+
+        panel.style.display = "block";
+        profilePanel.style.display = "block";
+
+        const ui = INDUSTRY_UI[industryKey];
+        if (ui) {
+          throughputLabel.textContent = ui.throughput;
+          throughputInput.value = ui.defaultVal;
+          throughputInput.style.display = "block";
+          throughputLabel.style.display = "block";
+        }
+      }
+
+      function getSelectedProcessKeys() {
+        const checks = document.querySelectorAll('#processChecks input[type=checkbox]:checked');
+        return Array.from(checks).map(cb => cb.value);
+      }
+
+      document.getElementById("industrySelect").addEventListener("change", function() { showProcessCheckboxes(this.value); });
+
+      // ===== MAIN CALCULATION =====
+      async function calcAnnualPVT() {
+        try {
+          const tiltAngle = parseFloat(document.getElementById("tiltAngle").value);
+          const azimuthAngle = parseFloat(document.getElementById("azimuthAngle").value);
+          const albedo = parseFloat(document.getElementById("albedo").value);
+          const A = parseFloat(document.getElementById("area").value);
+          const flowRate = parseFloat(document.getElementById("flowRate").value);
+          const etaPv = parseFloat(document.getElementById("etaPv").value);
+          const Tin = parseFloat(document.getElementById("tin").value);
+          const a0 = parseFloat(document.getElementById("pvtA0").value);
+          const a1 = parseFloat(document.getElementById("pvtA1").value);
+          const a2 = parseFloat(document.getElementById("pvtA2").value);
+
+          const needed = [tiltAngle, azimuthAngle, albedo, A, flowRate, etaPv, Tin, a0, a1, a2];
+          if (needed.some(v => !isFiniteNumber(v))) { setOutput("Please fill in all inputs with valid numbers.", true); return; }
+          if (A <= 0) { setOutput("Area A must be > 0.", true); return; }
+          if (flowRate < 0) { setOutput("Flow Rate must be ≥ 0.", true); return; }
+          if (etaPv < 0 || etaPv > 1) { setOutput("PV efficiency η must be between 0 and 1.", true); return; }
+
+          const totalFlow_kg_hr = flowRate * A * 3600;
+
+          if (!CURRENT_MET || !CURRENT_LOC) await loadTMYByAddress();
+          const latitude = CURRENT_LOC.lat, longitude = CURRENT_LOC.lon, met = CURRENT_MET;
+
+          if (!met?.length) { setOutput("TMY contains no usable records.", true); return; }
+
+          const calculator = new TiltedSurfaceRadiation(latitude, longitude, tiltAngle, azimuthAngle, albedo);
+          let E_pv_kWh = 0, E_th_kWh = 0;
+          const out = [];
+          out.push(["dayN","hourN","gtilt_Wm2","eta_th","pv_kWh","th_kWh","totalFlow_kg_hr","Tout_C"].join(","));
+          let used = 0;
+
+          for (const r of met) {
+            if (![r.dayN,r.hourN,r.dni,r.dhi,r.ta,r.vwind].every(isFiniteNumber)) continue;
+            const res = calculator.calculate(r.dayN, r.hourN, r.dni, r.dhi);
+            const G = Math.max(0, res.totalIrradiance);
+            let etaTh = 0;
+            if (G > 1e-6) { etaTh = a0 + a1 * ((Tin - r.ta) / G) + a2 * r.vwind; etaTh = clamp(etaTh, 0, 1); }
+            const pv_kWh = (etaPv * G * A) / 1000;
+            const th_kWh = (etaTh * G * A) / 1000;
+            const hourlyFlow_kg_hr = (th_kWh > 1e-12) ? totalFlow_kg_hr : "";
+            E_pv_kWh += pv_kWh;
+            E_th_kWh += th_kWh;
+            let Tout_C = "";
+            if (th_kWh > 1e-12 && totalFlow_kg_hr > 1e-12) { Tout_C = Tin + (th_kWh * 3600) / (totalFlow_kg_hr * 4.184); }
+            out.push([r.dayN, r.hourN + 1, G.toFixed(2), etaTh.toFixed(2), pv_kWh.toFixed(2), th_kWh.toFixed(2),
+              (hourlyFlow_kg_hr === "" ? "" : (+hourlyFlow_kg_hr).toFixed(2)), (Tout_C === "" ? "" : (+Tout_C).toFixed(2))].join(","));
+            used++;
+          }
+
+          if (used === 0) { setOutput("No valid numeric rows found in the TMY records.", true); return; }
+
+          let html = `<h3>Annual Results (hourly sum)</h3><p><b>Location:</b> ${CURRENT_LOC.name} (lat=${latitude.toFixed(6)}, lon=${longitude.toFixed(6)})</p><p><b>Valid hourly records used:</b> ${used}</p><p><b>PV :</b> <span class="ok">${E_pv_kWh.toFixed(1)} kWh</span></p><p><b>Thermal (PVT model):</b> <span class="ok">${E_th_kWh.toFixed(1)} kWh</span></p><p><b>Total:</b> <span class="ok">${(E_pv_kWh + E_th_kWh).toFixed(1)} kWh</span></p>`;
+
+          const industry = document.getElementById("industrySelect").value;
+          const profileType = document.getElementById("profileType")?.value || "flat";
+          const rampUp = document.getElementById("rampUp")?.value || "none";
+          
+          if (industry && INDUSTRY_UI[industry]) {
+            const ui = INDUSTRY_UI[industry];
+            const throughput = parseFloat(document.getElementById("throughputInput").value) || 0;
+            const selectedKeys = getSelectedProcessKeys();
+            const processes = INDUSTRY_PROCESSES[industry] || {};
+            let procRows = "";
+            for (const key of selectedKeys) {
+              const proc = processes[key];
+              if (!proc) continue;
+              procRows += `<tr><td>${proc.label}</td><td class="num">—</td></tr>`;
+            }
+            const profileLabels = { flat: "Flat annual demand", day_5: "9–5, 5 day week", continuous: "24/7 continuous" };
+            const rampLabels = { none: "None", "1h": "1 hour", "2h": "2 hours" };
+            html += `<hr style="border:none;border-top:1px solid #ddd;margin:14px 0;" /><h3>Thermal Demand — ${ui.name}</h3><p style="font-size:13px;">${ui.throughput.replace(':','')} <b>${throughput.toLocaleString()}</b></p><p style="font-size:13px;"><b>Operating profile:</b> ${profileLabels[profileType] || "Flat annual demand"}</p><p style="font-size:13px;"><b>Startup ramp-up:</b> ${rampLabels[rampUp] || "None"}</p><table class="result-table"><tr><th>Process</th><th style="text-align:right;">Annual Demand (kWh)</th></tr>${procRows}<tr style="font-weight:bold;border-top:2px solid #999;"><td>Total thermal demand</td><td class="num">—</td></tr></table><h3>Supply vs Demand (no storage)</h3><table class="result-table"><tr><td>Demand met by PVT</td><td class="num">—</td></tr><tr><td>Unmet demand (boiler required)</td><td class="num">—</td></tr><tr><td>Excess PVT thermal (unused)</td><td class="num">—</td></tr><tr><td>Solar fraction</td><td class="num">—</td></tr></table><p class="note" style="margin-top:10px;"><b>Note:</b> Load profile calculations for ${ui.name} are under development.</p>`;
+          }
+
+          setOutput(html);
+
+          const BASE_YEAR_FOR_TABLES = new Date().getFullYear() - 1;
+          const timeSeries = [];
+          for (let i = 1; i < out.length; i++) {
+            const cols = out[i].split(",");
+            const dayN = +cols[0], hourN = +cols[1] - 1, pvKwh = +cols[4], thKwh = +cols[5];
+            const totalFlowKghr = cols[6] === "" ? 0 : +cols[6], toutC = cols[7] === "" ? 0 : +cols[7];
+            const d = new Date(BASE_YEAR_FOR_TABLES, 0, 1);
+            d.setDate(d.getDate() + (dayN - 1));
+            const dateStr = d.toISOString().slice(0, 10);
+            timeSeries.push({ date: dateStr, dayN, hourN, pv_kWh: pvKwh, th_kWh: thKwh, totalFlow_kg_hr: totalFlowKghr, Tout_C: toutC });
+          }
+          
+          const monthlyAll = aggregateMonthlyAll(timeSeries, BASE_YEAR_FOR_TABLES);
+          renderMonthlyAllTable(monthlyAll);
+          renderMonthlyChart(monthlyAll);
+          renderTemperatureChartJS(monthlyAll);
+          renderTemperatureTable(monthlyAll);
+
+          const monthSelector = document.getElementById("monthSelector");
+          const selectedMonth = parseInt(monthSelector.value) || 1;
+          const dailyAll = aggregateDailyAll(timeSeries, BASE_YEAR_FOR_TABLES, selectedMonth);
+          renderDailyAllTable(dailyAll);
+          renderDailyChart(dailyAll);
+
+          monthSelector.removeEventListener("change", null);
+          monthSelector.addEventListener("change", function() {
+            const selectedMonth = parseInt(this.value) || 1;
+            const dailyAll = aggregateDailyAll(timeSeries, BASE_YEAR_FOR_TABLES, selectedMonth);
+            renderDailyAllTable(dailyAll);
+            renderDailyChart(dailyAll);
+          });
+
+          const csv = out.join("\n");
+          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const a = document.getElementById("downloadLink");
+          const safeName = (CURRENT_LOC.name || "location").toLowerCase().replace(/[^a-z0-9]+/g,"_");
+          a.href = url;
+          a.download = `Annual_PVT_${safeName}_${used}h.csv`;
+          a.style.display = "inline-block";
+
+        } catch (err) {
+          console.error(err);
+          setOutput(`Error: ${err.message}`, true);
+        }
+      }
+
+      document.getElementById("btnAnnual").addEventListener("click", calcAnnualPVT);
+      document.getElementById("btnLoadTMY").addEventListener("click", async () => {
+        try { await loadTMYByAddress(); }
+        catch (e) { console.error(e); setOutput(`Error: ${e.message}`, true); }
+      });
+
+    }); // DOMContentLoaded 结束
+  </script>
+</div>
+</body>
+</html>
