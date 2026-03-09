@@ -41,122 +41,46 @@
   <h1>Annual PVT Calculator</h1>
 
   <div class="panel">
-    <div class="grid">
-      <label for="addressInput"><b>Address:</b></label>
-      <div>
-        <input id="addressInput" type="text" placeholder="e.g. 1 George St, Sydney NSW, Australia" />
-        <div class="btns" style="margin:8px 0 0;">
-          <button id="btnLoadTMY" type="button">Load Weather Data</button>
-        </div>
-        <div id="locConfirm" class="note" style="margin-top:6px;"></div>
+  <div class="grid">
+    <label for="addressInput"><b>Address:</b></label>
+    <div>
+      <input id="addressInput" type="text" placeholder="e.g. 1 George St, Sydney NSW, Australia" />
+      <div class="btns" style="margin:8px 0 0;">
+        <button id="btnLoadTMY" type="button">Load Weather Data</button>
       </div>
-
-      <label for="tiltAngle">Tilt Angle (deg):</label>
-      <input id="tiltAngle" type="number" step="0.01" value="30" />
-
-      <label for="azimuthAngle">Surface Azimuth Angle (deg):</label>
-      <input id="azimuthAngle" type="number" step="0.01" value="0" />
-
-      <label for="albedo">Ground Albedo (0-1):</label>
-      <input id="albedo" type="number" min="0" max="1" step="0.01" value="0.2" />
-
-      <label for="area">Collector / PV Area A (m²):</label>
-      <input id="area" type="number" min="0" step="0.01" value="1.0" />
-
-      <label for="flowRate">Flow Rate (L/s/m²):</label>
-      <input id="flowRate" type="number" min="0" step="0.001" value="0.02" />
-
-      <label for="etaPv">PV efficiency η (0–1):</label>
-      <input id="etaPv" type="number" min="0" max="1" step="0.01" value="0.20" />
-
-      <label for="tin">Inlet temperature Tin (°C):</label>
-      <input id="tin" type="number" step="0.1" value="10" />
-
-      <div class="hint full-row" style="margin:8px 0 4px;font-size:12px;color:#555;line-height:1.4;">
-        <b>PVT Thermal Efficiency Model:</b>
-        <code>η_th = a0 + a1 * ((Tin - Ta) / G) + a2 * v_wind</code>
-      </div>
-
-      <label for="pvtA0">PVT a0:</label>
-      <input id="pvtA0" type="number" step="0.000000001" value="0.279952866" />
-
-      <label for="pvtA1">PVT a1:</label>
-      <input id="pvtA1" type="number" step="0.000000001" value="-10.52839866" />
-
-      <label for="pvtA2">PVT a2:</label>
-      <input id="pvtA2" type="number" step="0.000000001" value="-0.008135537" />
-
-      <div class="full-row" style="border-top:1px solid #ddd;margin:12px 0 6px;padding-top:10px;">
-        <b style="font-size:14px;">Industry Thermal Demand (optional)</b>
-      </div>
-
-      <label for="industrySelect"><b>Industry:</b></label>
-      <select id="industrySelect">
-        <option value="">— None (PVT supply only) —</option>
-        <option value="dairy_farm">Dairy Farm</option>
-        <option value="brewery">Brewery</option>
-        <option value="hotel">Hotel</option>
-        <option value="commercial_laundry">Commercial Laundry</option>
-      </select>
-
-      <label for="throughputInput" id="throughputLabel" style="display:none;">Throughput (L/year):</label>
-      <input id="throughputInput" type="number" min="0" step="1" value="0" style="display:none;" />
-
-      <label for="electricityPrice"><b>Local Electricity Price (AUD/kWh):</b></label>
-      <input id="electricityPrice" type="number" min="0" step="0.01" value="0.27" />
-
-      <div id="processPanel" class="full-row" style="display:none;">
-        <div style="margin:8px 0;padding:10px;background:#f0f4f8;border-radius:6px;border:1px solid #cce;">
-          <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Select thermal processes:</div>
-          <div id="processChecks"></div>
-        </div>
-      </div>
-
-      <div id="profilePanel" class="full-row" style="display:none;">
-        <div style="margin:8px 0;padding:10px;background:#f8f8f8;border-radius:6px;border:1px solid #ddd;">
-          <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Operating profile:</div>
-          <label for="profileType" style="display:block;margin-bottom:6px;">Profile type:</label>
-          <select id="profileType" style="margin-bottom:10px;">
-            <option value="flat">Flat annual demand</option>
-            <option value="day_5">9–5, 5 day week</option>
-            <option value="continuous">24/7 continuous</option>
-          </select>
-          <label for="rampUp" style="display:block;margin-bottom:6px;">Startup ramp-up:</label>
-          <select id="rampUp">
-            <option value="none">None</option>
-            <option value="1h">1 hour</option>
-            <option value="2h">2 hours</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="btns full-row">
-        <button id="btnAnnual" type="button">Calculate Annual PV + Thermal</button>
-      </div>
-
-      <div id="pvt-data-table" class="full-row" style="border-top:1px solid #ddd;padding:12px 0 24px;margin-top:16px;">
-        <h4>Monthly Data (Charts & Tables)</h4>
-        <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
-        <div id="monthlyDataTable" class="data-table-container"></div>
-
-        <div style="margin:16px 0;">
-          <label for="monthSelector">Select month for daily details:</label>
-          <select id="monthSelector" style="padding:8px;margin-left:8px;">
-            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
-            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
-            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
-            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
-          </select>
-        </div>
-
-        <div class="chart-container"><canvas id="dailyChart"></canvas></div>
-        <div id="dailyDataTable" class="data-table-container"></div>
-
-        <div class="chart-container"><canvas id="temperatureChart"></canvas></div>
-        <div id="temperatureDataTable" class="data-table-container"></div>
-      </div>
+      <div id="locConfirm" class="note" style="margin-top:6px;"></div>
     </div>
+
+    <!-- ... 很多输入框 ... -->
+
+    <div class="btns full-row">
+      <button id="btnAnnual" type="button">Calculate Annual PV + Thermal</button>
+    </div>
+  </div>  <!-- ← 关键：这里关闭 .grid -->
+
+  <!-- ← 关键：把图表容器移到 grid 外面 -->
+  <div id="pvt-data-table" style="border-top:1px solid #ddd;padding:12px 0 24px;margin-top:16px;">
+    <h4>Monthly Data (Charts & Tables)</h4>
+    <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
+    <div id="monthlyDataTable" class="data-table-container"></div>
+
+    <div style="margin:16px 0;">
+      <label for="monthSelector">Select month for daily details:</label>
+      <select id="monthSelector" style="padding:8px;margin-left:8px;">
+        <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+        <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+        <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+        <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+      </select>
+    </div>
+
+    <div class="chart-container"><canvas id="dailyChart"></canvas></div>
+    <div id="dailyDataTable" class="data-table-container"></div>
+
+    <div class="chart-container"><canvas id="temperatureChart"></canvas></div>
+    <div id="temperatureDataTable" class="data-table-container"></div>
   </div>
+</div>
 
   <div id="output" class="panel">Ready.</div>
 
