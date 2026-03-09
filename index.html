@@ -18,6 +18,7 @@
     #output{margin-top:12px;}
     .err{color:#b00020;}
     .ok{color:#0b6b2d;}
+    .loading{color:#0066cc;}
     .full-row { grid-column: 1 / -1; }
     #downloadLink{display:none;margin-top:10px;}
     @media (max-width:780px){.grid{grid-template-columns:1fr;}}
@@ -45,7 +46,7 @@
       <div>
         <input id="addressInput" type="text" placeholder="e.g. 1 George St, Sydney NSW, Australia" />
         <div class="btns" style="margin:8px 0 0;">
-          <button id="btnLoadTMY" type="button">Geocode & Load TMY</button>
+          <button id="btnLoadTMY" type="button">Load Weather Data</button>
         </div>
         <div id="locConfirm" class="note" style="margin-top:6px;"></div>
       </div>
@@ -101,27 +102,8 @@
       <label for="throughputInput" id="throughputLabel" style="display:none;">Throughput (L/year):</label>
       <input id="throughputInput" type="number" min="0" step="1" value="0" style="display:none;" />
 
-      <div id="pvt-data-table" class="full-row" style="border-top:1px solid #ddd;padding:12px 0 24px;margin-top:16px;">
-        <h4>Monthly Data (Charts & Tables)</h4>
-        <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
-        <div id="monthlyDataTable" class="data-table-container"></div>
-
-        <div style="margin:16px 0;">
-          <label for="monthSelector">Select month for daily details:</label>
-          <select id="monthSelector" style="padding:8px;margin-left:8px;">
-            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
-            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
-            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
-            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
-          </select>
-        </div>
-
-        <div class="chart-container"><canvas id="dailyChart"></canvas></div>
-        <div id="dailyDataTable" class="data-table-container"></div>
-
-        <div class="chart-container"><canvas id="temperatureChart"></canvas></div>
-        <div id="temperatureDataTable" class="data-table-container"></div>
-      </div>
+      <label for="electricityPrice"><b>Local Electricity Price (AUD/kWh):</b></label>
+      <input id="electricityPrice" type="number" min="0" step="0.01" value="0.27" />
 
       <div id="processPanel" class="full-row" style="display:none;">
         <div style="margin:8px 0;padding:10px;background:#f0f4f8;border-radius:6px;border:1px solid #cce;">
@@ -150,12 +132,37 @@
 
       <div class="btns full-row">
         <button id="btnAnnual" type="button">Calculate Annual PV + Thermal</button>
-        <a id="downloadLink" href="#" target="_blank" rel="noopener">Download hourly details CSV</a>
+      </div>
+
+      <div id="pvt-data-table" class="full-row" style="border-top:1px solid #ddd;padding:12px 0 24px;margin-top:16px;">
+        <h4>Monthly Data (Charts & Tables)</h4>
+        <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
+        <div id="monthlyDataTable" class="data-table-container"></div>
+
+        <div style="margin:16px 0;">
+          <label for="monthSelector">Select month for daily details:</label>
+          <select id="monthSelector" style="padding:8px;margin-left:8px;">
+            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+          </select>
+        </div>
+
+        <div class="chart-container"><canvas id="dailyChart"></canvas></div>
+        <div id="dailyDataTable" class="data-table-container"></div>
+
+        <div class="chart-container"><canvas id="temperatureChart"></canvas></div>
+        <div id="temperatureDataTable" class="data-table-container"></div>
       </div>
     </div>
   </div>
 
   <div id="output" class="panel">Ready.</div>
+
+  <div class="btns" style="margin-top:20px;">
+    <a id="downloadLink" href="#" target="_blank" rel="noopener">Download hourly details CSV</a>
+  </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -164,6 +171,12 @@
       let monthlyChartInstance = null, dailyChartInstance = null, temperatureChartInstance = null;
 
       const setOutput = (html, isError=false) => document.getElementById("output").innerHTML = isError ? `<span class="err">${html}</span>` : html;
+      const setLocConfirm = (html, isLoading=false) => {
+        const elem = document.getElementById("locConfirm");
+        elem.innerHTML = html;
+        if (isLoading) elem.className = "note loading";
+        else elem.className = "note";
+      };
       const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
       const isFiniteNumber = x => typeof x === "number" && Number.isFinite(x);
 
@@ -422,17 +435,23 @@
 
       async function loadTMYByAddress() {
         const addr = document.getElementById("addressInput").value;
-        setOutput("Geocoding & loading TMY...");
-        const loc = await geocodeAddress(addr);
-        const tzInfo = await fetchTimezone(loc.lat, loc.lon);
-        CURRENT_TZ = tzInfo;
-        const tzDisplay = tzInfo?.timeZone ? `${tzInfo.timeZone} (GMT offset ${tzInfo.gmtOffset ?? ""})` : "unknown";
-        document.getElementById("locConfirm").textContent = `Location: ${loc.name} (lat=${loc.lat.toFixed(6)}, lon=${loc.lon.toFixed(6)}), Timezone: ${tzDisplay}`;
-        const raw = await fetchTMY(loc.lat, loc.lon);
-        const met = normalizeWeatherRecords(raw);
-        CURRENT_LOC = loc;
-        CURRENT_MET = met;
-        setOutput("TMY loaded. Now click Calculate Annual PV + Thermal.");
+        setLocConfirm("⏳ Loading weather data...", true);
+        try {
+          const loc = await geocodeAddress(addr);
+          const tzInfo = await fetchTimezone(loc.lat, loc.lon);
+          CURRENT_TZ = tzInfo;
+          const tzDisplay = tzInfo?.timeZone ? `${tzInfo.timeZone} (GMT offset ${tzInfo.gmtOffset ?? ""})` : "unknown";
+          
+          setLocConfirm(`✓ Location: ${loc.name} (lat=${loc.lat.toFixed(6)}, lon=${loc.lon.toFixed(6)})<br/>Timezone: ${tzDisplay}<br/><span class="ok">Weather data loaded successfully.</span>`);
+          
+          const raw = await fetchTMY(loc.lat, loc.lon);
+          const met = normalizeWeatherRecords(raw);
+          CURRENT_LOC = loc;
+          CURRENT_MET = met;
+        } catch (error) {
+          setLocConfirm(`❌ Error: ${error.message}`, false);
+          throw error;
+        }
       }
 
       // ===== INDUSTRY =====
@@ -506,19 +525,21 @@
           const a0 = parseFloat(document.getElementById("pvtA0").value);
           const a1 = parseFloat(document.getElementById("pvtA1").value);
           const a2 = parseFloat(document.getElementById("pvtA2").value);
+          const electricityPrice = parseFloat(document.getElementById("electricityPrice").value);
 
-          const needed = [tiltAngle, azimuthAngle, albedo, A, flowRate, etaPv, Tin, a0, a1, a2];
+          const needed = [tiltAngle, azimuthAngle, albedo, A, flowRate, etaPv, Tin, a0, a1, a2, electricityPrice];
           if (needed.some(v => !isFiniteNumber(v))) { setOutput("Please fill in all inputs with valid numbers.", true); return; }
           if (A <= 0) { setOutput("Area A must be > 0.", true); return; }
           if (flowRate < 0) { setOutput("Flow Rate must be ≥ 0.", true); return; }
           if (etaPv < 0 || etaPv > 1) { setOutput("PV efficiency η must be between 0 and 1.", true); return; }
+          if (electricityPrice < 0) { setOutput("Electricity price must be ≥ 0.", true); return; }
 
           const totalFlow_kg_hr = flowRate * A * 3600;
 
           if (!CURRENT_MET || !CURRENT_LOC) await loadTMYByAddress();
           const latitude = CURRENT_LOC.lat, longitude = CURRENT_LOC.lon, met = CURRENT_MET;
 
-          if (!met?.length) { setOutput("TMY contains no usable records.", true); return; }
+          if (!met?.length) { setOutput("Weather data contains no usable records.", true); return; }
 
           const calculator = new TiltedSurfaceRadiation(latitude, longitude, tiltAngle, azimuthAngle, albedo);
           let E_pv_kWh = 0, E_th_kWh = 0;
@@ -544,9 +565,11 @@
             used++;
           }
 
-          if (used === 0) { setOutput("No valid numeric rows found in the TMY records.", true); return; }
+          if (used === 0) { setOutput("No valid numeric rows found in the weather records.", true); return; }
 
-          let html = `<h3>Annual Results (hourly sum)</h3><p><b>Location:</b> ${CURRENT_LOC.name} (lat=${latitude.toFixed(6)}, lon=${longitude.toFixed(6)})</p><p><b>Valid hourly records used:</b> ${used}</p><p><b>PV :</b> <span class="ok">${E_pv_kWh.toFixed(1)} kWh</span></p><p><b>Thermal (PVT model):</b> <span class="ok">${E_th_kWh.toFixed(1)} kWh</span></p><p><b>Total:</b> <span class="ok">${(E_pv_kWh + E_th_kWh).toFixed(1)} kWh</span></p>`;
+          const totalEnergy = E_pv_kWh + E_th_kWh;
+
+          let html = `<h3>Annual Results (hourly sum)</h3><p><b>Location:</b> ${CURRENT_LOC.name} (lat=${latitude.toFixed(6)}, lon=${longitude.toFixed(6)})</p><p><b>Valid hourly records used:</b> ${used}</p><table class="result-table"><tr><td><b>PV Energy</b></td><td class="num"><span class="ok">${E_pv_kWh.toFixed(1)} kWh</span></td></tr><tr><td><b>Thermal Energy (PVT model)</b></td><td class="num"><span class="ok">${E_th_kWh.toFixed(1)} kWh</span></td></tr><tr><td><b>Total Energy</b></td><td class="num"><span class="ok">${totalEnergy.toFixed(1)} kWh</span></td></tr></table>`;
 
           const industry = document.getElementById("industrySelect").value;
           const profileType = document.getElementById("profileType")?.value || "flat";
@@ -620,7 +643,7 @@
       document.getElementById("btnAnnual").addEventListener("click", calcAnnualPVT);
       document.getElementById("btnLoadTMY").addEventListener("click", async () => {
         try { await loadTMYByAddress(); }
-        catch (e) { console.error(e); setOutput(`Error: ${e.message}`, true); }
+        catch (e) { console.error(e); }
       });
 
     }); // DOMContentLoaded 结束
