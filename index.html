@@ -72,19 +72,63 @@
     <label for="tin">Inlet temperature Tin (°C):</label>
     <input id="tin" type="number" step="0.1" value="10" />
 
-    <div class="hint full-row" style="margin:8px 0 4px;font-size:12px;color:#555;line-height:1.4;">
-      <b>PVT Thermal Efficiency Model:</b>
-      <code>η_th = a0 + a1 * ((Tin - Ta) / G) + a2 * v_wind</code>
+        <!-- ===== THERMAL MODEL SELECTOR ===== -->
+    <div class="full-row" style="margin:10px 0 4px;border-top:1px solid #ddd;padding-top:10px;">
+      <b style="font-size:14px;">PVT Thermal Efficiency Model</b>
+    </div>
+    <div class="full-row" style="margin:4px 0 8px;">
+      <label style="display:inline-flex;align-items:center;gap:6px;margin-right:20px;cursor:pointer;">
+        <input type="radio" name="thermalModel" id="modelA" value="A" checked />
+        <span style="font-size:13px;"><b>Model A</b> — Simple linear (existing)</span>
+      </label>
+      <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="radio" name="thermalModel" id="modelB" value="B" />
+        <span style="font-size:13px;"><b>Model B</b> — ISO 9806 full model (Eq.12)</span>
+      </label>
     </div>
 
-    <label for="pvtA0">PVT a0:</label>
-    <input id="pvtA0" type="number" step="0.000000001" value="0.279952866" />
+    <!-- Model A params -->
+    <div id="modelAParams" class="full-row">
+      <div class="grid" style="margin:0;">
+        <div class="hint full-row" style="margin:4px 0;font-size:12px;color:#555;line-height:1.4;">
+          <code>η_th = a0 + a1 × ((Tin − Ta) / G) + a2 × v_wind</code>
+        </div>
+        <label for="pvtA0">a0 (peak efficiency η₀):</label>
+        <input id="pvtA0" type="number" step="0.000000001" value="0.279952866" />
+        <label for="pvtA1">a1 — heat loss coeff (W/m²K):</label>
+        <input id="pvtA1" type="number" step="0.000000001" value="-10.52839866" />
+        <label for="pvtA2">a2 — wind speed coeff:</label>
+        <input id="pvtA2" type="number" step="0.000000001" value="-0.008135537" />
+      </div>
+    </div>
 
-    <label for="pvtA1">PVT a1:</label>
-    <input id="pvtA1" type="number" step="0.000000001" value="-10.52839866" />
-
-    <label for="pvtA2">PVT a2:</label>
-    <input id="pvtA2" type="number" step="0.000000001" value="-0.008135537" />
+    <!-- Model B params (ISO 9806 Eq.12) -->
+    <div id="modelBParams" class="full-row" style="display:none;">
+      <div style="font-size:12px;color:#555;margin:4px 0 8px;background:#fffbe6;border:1px solid #ffe58f;border-radius:5px;padding:8px;">
+        <b>Q = A<sub>G</sub> [η<sub>0,hem</sub>·G<sub>hem</sub> − a1·(ϑ<sub>m</sub>−ϑ<sub>a</sub>) − a2·(ϑ<sub>m</sub>−ϑ<sub>a</sub>)² − a3·u·(ϑ<sub>m</sub>−ϑ<sub>a</sub>) + a4·(E<sub>L</sub>−σT<sub>a</sub>⁴) − a6·u·G<sub>hem</sub> − a8·(ϑ<sub>m</sub>−ϑ<sub>a</sub>)⁴]</b><br/>
+        <span style="font-size:11px;">ϑ<sub>m</sub> = (Tin + Tout)/2，iterated per hour. a3,a4,a6,a8 可设为 0 忽略。</span>
+      </div>
+      <div class="grid" style="margin:0;">
+        <label for="isoEta0">η<sub>0,hem</sub> — peak efficiency:</label>
+        <input id="isoEta0" type="number" step="0.0001" value="0.762" />
+        <label for="isoA1">a1 — heat loss coeff (W/m²K):</label>
+        <input id="isoA1" type="number" step="0.0001" value="3.93" />
+        <label for="isoA2">a2 — temp² loss coeff (W/m²K²):</label>
+        <input id="isoA2" type="number" step="0.00001" value="0.0095" />
+        <label for="isoA3">a3 — wind×temp loss (J/m³K):</label>
+        <input id="isoA3" type="number" step="0.00001" value="0" />
+        <label for="isoA4">a4 — sky temp coeff (−):</label>
+        <input id="isoA4" type="number" step="0.00001" value="0" />
+        <label for="isoA6">a6 — wind×G coeff (s/m):</label>
+        <input id="isoA6" type="number" step="0.00001" value="0" />
+        <label for="isoA8">a8 — 4th order loss (W/m²K⁴):</label>
+        <input id="isoA8" type="number" step="0.0000001" value="0" />
+        <label for="isoTout0">Initial Tout guess (°C):</label>
+        <input id="isoTout0" type="number" step="0.1" value="40" />
+        <label for="isoIterMax">Max iterations (Newton):</label>
+        <input id="isoIterMax" type="number" min="1" max="10" step="1" value="1" />
+      </div>
+    </div>
 
     <div class="full-row" style="border-top:1px solid #ddd;margin:12px 0 6px;padding-top:10px;">
       <b style="font-size:14px;">Industry Thermal Demand (optional)</b>
@@ -102,8 +146,30 @@
     <label for="throughputInput" id="throughputLabel" style="display:none;">Throughput (L/year):</label>
     <input id="throughputInput" type="number" min="0" step="1" value="0" style="display:none;" />
 
-    <label for="electricityPrice"><b>Local Electricity Price (AUD/kWh):</b></label>
+        <div class="full-row" style="border-top:1px solid #ddd;margin:12px 0 6px;padding-top:10px;">
+      <b style="font-size:14px;">Economic Parameters</b>
+    </div>
+
+    <label for="electricityPrice"><b>Electricity Price ($/kWh):</b></label>
     <input id="electricityPrice" type="number" min="0" step="0.01" value="0.27" />
+
+    <label for="gasPriceInput"><b>Natural Gas Price ($/MJ):</b></label>
+    <input id="gasPriceInput" type="number" min="0" step="0.001" value="0.012" />
+
+    <label for="boilerEffInput">Boiler Efficiency (0–1):</label>
+    <input id="boilerEffInput" type="number" min="0.1" max="1" step="0.01" value="0.90" />
+
+    <label for="capexInput"><b>CAPEX – Unit Cost ($/m²):</b></label>
+    <input id="capexInput" type="number" min="0" step="10" value="800" />
+
+    <label for="opexRateInput">OPEX Rate (% of CAPEX / yr):</label>
+    <input id="opexRateInput" type="number" min="0" max="20" step="0.1" value="1.5" />
+
+    <label for="systemLifeInput">System Lifetime N (years):</label>
+    <input id="systemLifeInput" type="number" min="1" max="50" step="1" value="25" />
+
+    <label for="discountRateInput">Discount Rate r (%):</label>
+    <input id="discountRateInput" type="number" min="0" max="30" step="0.1" value="6" />
 
     <div id="processPanel" class="full-row" style="display:none;">
       <div style="margin:8px 0;padding:10px;background:#f0f4f8;border-radius:6px;border:1px solid #cce;">
@@ -167,6 +233,14 @@
   
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+
+    // ===== THERMAL MODEL SWITCHER =====
+      document.querySelectorAll('input[name="thermalModel"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+          document.getElementById('modelAParams').style.display = this.value === 'A' ? 'block' : 'none';
+          document.getElementById('modelBParams').style.display = this.value === 'B' ? 'block' : 'none';
+        });
+      });
 
       let CURRENT_LOC = null, CURRENT_MET = null, CURRENT_TZ = null;
       let monthlyChartInstance = null, dailyChartInstance = null, temperatureChartInstance = null;
@@ -527,9 +601,30 @@
           const a0 = parseFloat(document.getElementById("pvtA0").value);
           const a1 = parseFloat(document.getElementById("pvtA1").value);
           const a2 = parseFloat(document.getElementById("pvtA2").value);
-          const electricityPrice = parseFloat(document.getElementById("electricityPrice").value);
-
+           const electricityPrice = parseFloat(document.getElementById("electricityPrice").value);
+          const gasPrice         = parseFloat(document.getElementById("gasPriceInput").value);      // $/MJ
+          const boilerEff        = parseFloat(document.getElementById("boilerEffInput").value);     // 0–1
+          const capexPerM2 = parseFloat(document.getElementById("capexInput").value); // $/m²
+          const   capex = capexPerM2 * A;  // total $
+          const opexRate         = parseFloat(document.getElementById("opexRateInput").value) / 100;// fraction
+          const systemLife       = parseInt(document.getElementById("systemLifeInput").value) || 25;
+          const discountRate     = parseFloat(document.getElementById("discountRateInput").value) / 100;
+          const thermalModel = document.querySelector('input[name="thermalModel"]:checked')?.value || 'A';
+          const isoEta0     = parseFloat(document.getElementById("isoEta0").value);
+          const isoA1       = parseFloat(document.getElementById("isoA1").value);
+          const isoA2       = parseFloat(document.getElementById("isoA2").value);
+          const isoA3       = parseFloat(document.getElementById("isoA3").value);
+          const isoA4       = parseFloat(document.getElementById("isoA4").value);
+          const isoA6       = parseFloat(document.getElementById("isoA6").value);
+          const isoA8       = parseFloat(document.getElementById("isoA8").value);
+          const isoTout0    = parseFloat(document.getElementById("isoTout0").value);
+          const isoIterMax  = parseInt(document.getElementById("isoIterMax").value) || 10;
+          const SIGMA = 5.67e-8;
           const needed = [tiltAngle, azimuthAngle, albedo, A, flowRate, etaPv, Tin, a0, a1, a2, electricityPrice];
+                    const neededB = thermalModel === 'B'
+            ? [isoEta0, isoA1, isoA2, isoA3, isoA4, isoA6, isoA8, isoTout0, isoIterMax]
+            : [a0, a1, a2];
+          if (neededB.some(v => !isFiniteNumber(v))) { setOutput("Please fill in all thermal model inputs with valid numbers.", true); return; }
           if (needed.some(v => !isFiniteNumber(v))) { setOutput("Please fill in all inputs with valid numbers.", true); return; }
           if (A <= 0) { setOutput("Area A must be > 0.", true); return; }
           if (flowRate < 0) { setOutput("Flow Rate must be ≥ 0.", true); return; }
@@ -540,9 +635,7 @@
 
           if (!CURRENT_MET || !CURRENT_LOC) await loadTMYByAddress();
           const latitude = CURRENT_LOC.lat, longitude = CURRENT_LOC.lon, met = CURRENT_MET;
-
           if (!met?.length) { setOutput("Weather data contains no usable records.", true); return; }
-
           const calculator = new TiltedSurfaceRadiation(latitude, longitude, tiltAngle, azimuthAngle, albedo);
           let E_pv_kWh = 0, E_th_kWh = 0;
           const out = [];
@@ -553,25 +646,159 @@
             if (![r.dayN,r.hourN,r.dni,r.dhi,r.ta,r.vwind].every(isFiniteNumber)) continue;
             const res = calculator.calculate(r.dayN, r.hourN, r.dni, r.dhi);
             const G = Math.max(0, res.totalIrradiance);
-            let etaTh = 0;
-            if (G > 1e-6) { etaTh = a0 + a1 * ((Tin - r.ta) / G) + a2 * r.vwind; etaTh = clamp(etaTh, 0, 1); }
+                        let etaTh = 0, th_W = 0;
             const pv_kWh = (etaPv * G * A) / 1000;
-            const th_kWh = (etaTh * G * A) / 1000;
+
+            if (thermalModel === 'A') {
+              // ---- Model A: simple linear ----
+              if (G > 1e-6) { etaTh = a0 + a1 * ((Tin - r.ta) / G) + a2 * r.vwind; etaTh = clamp(etaTh, 0, 1); }
+              th_W = etaTh * G * A;  // Watts
+
+            } else {
+              // ---- Model B: ISO 9806 Eq.12 ----
+              // Q = A[η0·Ghem − a1·Δϑ − a2·Δϑ² − a3·u·Δϑ + a4·(EL−σTa⁴) − a6·u·Ghem − a8·Δϑ⁴]
+              // ϑm = (Tin + Tout)/2 → Δϑ = ϑm − Ta → iterate Tout
+              // EL (longwave): approximate as σ·(Ta+273.15)^4 if not in TMY → a4 term ≈ 0
+              const EL = SIGMA * Math.pow(r.ta + 273.15, 4); // approx sky irradiance
+              const Ta4 = SIGMA * Math.pow(r.ta + 273.15, 4);
+              const u   = r.vwind || 0;
+              const Ghem = G; // use tilted surface irradiance as Ghem
+              if (G > 1e-6 && totalFlow_kg_hr > 1e-12) {
+                // Newton iteration: Tout converges via energy balance
+                // Q_model(Tout) = A[...with ϑm=(Tin+Tout)/2...]
+                // Q_flow(Tout)  = ṁ·cp·(Tout−Tin)  [ṁ in kg/s = totalFlow_kg_hr/3600]
+                const mdot_cp = (totalFlow_kg_hr / 3600) * 4184; // W/K
+                let Tout_iter = isoTout0;
+                for (let iter = 0; iter < isoIterMax; iter++) {
+                  const Tm   = (Tin + Tout_iter) / 2;
+                  const dT   = Tm - r.ta;
+                  const Q_model = A * (isoEta0 * Ghem
+                                     - isoA1 * dT
+                                     - isoA2 * dT * dT
+                                     - isoA3 * u  * dT
+                                     + isoA4 * (EL - Ta4)
+                                     - isoA6 * u  * Ghem
+                                     - isoA8 * Math.pow(dT, 4));
+                  const Q_flow  = mdot_cp * (Tout_iter - Tin);
+                  // residual F = Q_flow - Q_model = 0
+                  // dF/dTout = mdot_cp - A*(-a1/2 - a2*dT - a3*u/2 - 4*a8*dT^3/2)
+                  const dQmodel_dTout = A * (- isoA1*0.5
+                                             - isoA2 * dT
+                                             - isoA3 * u * 0.5
+                                             - isoA8 * 2 * Math.pow(dT, 3));
+                  const F  = Q_flow - Q_model;
+                  const dF = mdot_cp - dQmodel_dTout;
+                  const step = F / dF;
+                  Tout_iter -= step;
+                  if (Math.abs(step) < 1e-4) break;
+                }
+                const Tm_final = (Tin + Tout_iter) / 2;
+                const dT_final = Tm_final - r.ta;
+                th_W = Math.max(0, A * (isoEta0 * Ghem
+                                      - isoA1 * dT_final
+                                      - isoA2 * dT_final * dT_final
+                                      - isoA3 * u  * dT_final
+                                      + isoA4 * (EL - Ta4)
+                                      - isoA6 * u  * Ghem
+                                      - isoA8 * Math.pow(dT_final, 4)));
+                etaTh = (G * A > 1e-6) ? clamp(th_W / (G * A), 0, 1) : 0;
+              }
+            }
+
+            const th_kWh = th_W / 1000;  // W → kWh (1-hour timestep → Wh = W×1h → /1000 = kWh)
             const hourlyFlow_kg_hr = (th_kWh > 1e-12) ? totalFlow_kg_hr : "";
             E_pv_kWh += pv_kWh;
             E_th_kWh += th_kWh;
             let Tout_C = "";
-            if (th_kWh > 1e-12 && totalFlow_kg_hr > 1e-12) { Tout_C = Tin + (th_kWh * 3600) / (totalFlow_kg_hr * 4.184); }
+            if (th_kWh > 1e-12 && totalFlow_kg_hr > 1e-12) {
+              if (thermalModel === 'A') {
+                Tout_C = Tin + (th_kWh * 3600000) / (totalFlow_kg_hr / 3600 * 4184 * 3600);
+                // simplify: Tout = Tin + th_W / (mdot_cp)
+                Tout_C = Tin + th_W / ((totalFlow_kg_hr / 3600) * 4184);
+              } else {
+                // Model B: Tout is what iteration converged to — recompute cleanly
+                Tout_C = Tin + th_W / ((totalFlow_kg_hr / 3600) * 4184);
+              }
+            }
             out.push([r.dayN, r.hourN + 1, G.toFixed(2), etaTh.toFixed(2), pv_kWh.toFixed(2), th_kWh.toFixed(2),
               (hourlyFlow_kg_hr === "" ? "" : (+hourlyFlow_kg_hr).toFixed(2)), (Tout_C === "" ? "" : (+Tout_C).toFixed(2))].join(","));
             used++;
           }
 
-          if (used === 0) { setOutput("No valid numeric rows found in the weather records.", true); return; }
+                    const fmt  = (v, d=2, unit='') => v != null ? `${v.toFixed(d)} ${unit}`.trim() : '—';
+          const fmtC = (v, unit='$') => v != null ? `${unit}${v.toFixed(2)}` : '—';
+          // ===== 经济指标计算 =====
+            const N = systemLife;
+            const heatPrice = gasPrice * 3.6 / boilerEff;            // $/kWh_th
+            const annualSavingPV = E_pv_kWh * electricityPrice;       // $/yr
+            const annualSavingTH = E_th_kWh * heatPrice;              // $/yr
+            const opexAnnual     = capex * opexRate;                  // $/yr
+            const netAnnualBenefit = annualSavingPV + annualSavingTH - opexAnnual;
 
-          const totalEnergy = E_pv_kWh + E_th_kWh;
+            // CRF
+            const CRF = (discountRate > 1e-9)
+            ? discountRate * Math.pow(1 + discountRate, N) / (Math.pow(1 + discountRate, N) - 1)
+            : 1 / N;
 
-          let html = `<h3>Annual Results (hourly sum)</h3><p><b>Location:</b> ${CURRENT_LOC.name} (lat=${latitude.toFixed(6)}, lon=${longitude.toFixed(6)})</p><p><b>Valid hourly records used:</b> ${used}</p><table class="result-table"><tr><td><b>PV Energy</b></td><td class="num"><span class="ok">${E_pv_kWh.toFixed(1)} kWh</span></td></tr><tr><td><b>Thermal Energy (PVT model)</b></td><td class="num"><span class="ok">${E_th_kWh.toFixed(1)} kWh</span></td></tr><tr><td><b>Total Energy</b></td><td class="num"><span class="ok">${totalEnergy.toFixed(1)} kWh</span></td></tr></table>`;
+            // CAPEX 按能量比例分摊（热能折算为等效电）
+            const f_th2e = (electricityPrice > 1e-9) ? heatPrice / electricityPrice : 1;
+            const totalEnergyEq = E_pv_kWh + E_th_kWh * f_th2e;
+            const pvShare = (totalEnergyEq > 1e-9) ? E_pv_kWh / totalEnergyEq : 0.5;
+            const thShare = 1 - pvShare;
+
+            const capexPV = capex * pvShare;
+            const capexTH = capex * thShare;
+            const opexPV  = opexAnnual * pvShare;
+            const opexTH  = opexAnnual * thShare;
+
+            // LCOE / LCOH / Combined
+            const lcoe = (E_pv_kWh > 1e-9) ? (capexPV * CRF + opexPV) / E_pv_kWh : null;
+            const lcoh = (E_th_kWh > 1e-9) ? (capexTH * CRF + opexTH) / E_th_kWh : null;
+            const lcoeCombined = (totalEnergyEq > 1e-9) ? (capex * CRF + opexAnnual) / totalEnergyEq : null;
+
+            // SPP / NPV
+            const spp = (netAnnualBenefit > 1e-9) ? capex / netAnnualBenefit : null;
+            const npv = (discountRate > 1e-9)
+            ? -capex + netAnnualBenefit * (1 - Math.pow(1 + discountRate, -N)) / discountRate
+            : -capex + netAnnualBenefit * N;
+            const totalEnergy   = E_pv_kWh + E_th_kWh;
+            const specificOutput = (A > 1e-9) ? totalEnergy / A : null;
+          let html = `
+            <h3>Annual Results (hourly sum)</h3>
+            <p><b>Location:</b> ${CURRENT_LOC.name} (lat=${latitude.toFixed(4)}, lon=${longitude.toFixed(4)})</p>
+            <p><b>Valid hourly records used:</b> ${used}</p>
+
+            <h4 style="margin:14px 0 6px;color:#1a5276;">⚡ Energy Output</h4>
+            <table class="result-table">
+            <tr><td><b>PV Energy</b></td><td class="num"><span class="ok">${fmt(E_pv_kWh,1,'kWh')}</span></td></tr>
+            <tr><td><b>Thermal Energy</b></td><td class="num"><span class="ok">${fmt(E_th_kWh,1,'kWh')}</span></td></tr>
+            <tr><td><b>Total Energy</b></td><td class="num"><span class="ok">${fmt(totalEnergy,1,'kWh')}</span></td></tr>
+            <tr><td><b>Specific Output (per m²)</b></td><td class="num">${fmt(specificOutput,1,'kWh/m²/yr')}</td></tr>
+            </table>
+
+            <h4 style="margin:14px 0 6px;color:#1a5276;">💰 Economic Analysis</h4>
+            <table class="result-table">
+            <tr style="background:#f0f7ff;"><td colspan="2" style="padding:4px 8px;font-size:12px;color:#555;">
+            </td></tr>
+           <tr><td><b>CAPEX</b> (${fmt(capexPerM2,0,'$/m²')} × ${fmt(A,1,'m²')})</td><td class="num">${fmtC(capex)}</td></tr>
+            <tr><td><b>OPEX (annual)</b></td><td class="num">${fmtC(opexAnnual)} /yr</td></tr>
+            <tr><td><b>Annual Electricity Saving</b></td><td class="num"><span class="ok">${fmtC(annualSavingPV)} /yr</span></td></tr>
+            <tr><td><b>Annual Heat Saving (vs gas boiler)</b></td><td class="num"><span class="ok">${fmtC(annualSavingTH)} /yr</span></td></tr>
+            <tr><td><b>Annual Net Benefit</b></td><td class="num"><span class="${netAnnualBenefit>=0?'ok':'err'}">${fmtC(netAnnualBenefit)} /yr</span></td></tr>
+            <tr><td><b>Simple Payback Period (SPP)</b></td><td class="num">${spp != null ? fmt(spp,1,'years') : '—'}</td></tr>
+            <tr><td><b>NPV (${N} yr @ ${fmt(discountRate*100,1,'%')})</b></td><td class="num"><span class="${npv>=0?'ok':'err'}">${fmtC(npv)}</span></td></tr>
+            </table>
+
+            <h4 style="margin:14px 0 6px;color:#1a5276;">📊 Levelised Cost</h4>
+            <table class="result-table">
+            <tr><td><b>LCOE</b> (electricity only)</td><td class="num">${lcoe != null ? fmtC(lcoe,'')+'$/kWh_e' : '—'}</td></tr>
+            <tr><td><b>LCOH</b> (heat only)</td><td class="num">${lcoh != null ? fmtC(lcoh,'')+'$/kWh_th' : '—'}</td></tr>
+            <tr><td><b>Combined LCOE</b> (heat→electricity equiv.)</td><td class="num">${lcoeCombined != null ? fmtC(lcoeCombined,'')+'$/kWh_eq' : '—'}</td></tr>
+            <tr style="background:#fffbe6;"><td style="font-size:11px;color:#888;" colspan="2">
+                CAPEX split: PV ${fmt(pvShare*100,1,'%')} / Thermal ${fmt(thShare*100,1,'%')} (by energy ratio) &nbsp;|&nbsp;
+                CRF = ${fmt(CRF,5)} &nbsp;|&nbsp; Heat-to-elec equiv. factor = ${fmt(f_th2e,3)}
+            </td></tr>
+            </table>`;
 
           const industry = document.getElementById("industrySelect").value;
           const profileType = document.getElementById("profileType")?.value || "flat";
