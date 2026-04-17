@@ -94,7 +94,7 @@
           <code>η_th = a0 + a1 × ((Tin − Ta) / G) + a2 × v_wind</code>
         </div>
         <label for="pvtA0">a0 (peak efficiency η₀):</label>
-        <input id="pvtA0" type="number" step="0.000000001" value="0.627" />
+        <input id="pvtA0" type="number" step="0.000000001" value="0.4" />
         <label for="pvtA1">a1 — heat loss coeff (W/m²K):</label>
         <input id="pvtA1" type="number" step="0.000000001" value="-10.49" />
         <label for="pvtA2">a2 — wind speed coeff:</label>
@@ -105,12 +105,12 @@
     <!-- Model B params (ISO 9806 Eq.12) -->
     <div id="modelBParams" class="full-row" style="display:none;">
       <div style="font-size:12px;color:#555;margin:4px 0 8px;background:#fffbe6;border:1px solid #ffe58f;border-radius:5px;padding:8px;">
-        <b>η_th = [η<sub>0,hem</sub>·G<sub>hem</sub> − a1·(ϑ<sub>m</sub>−ϑ<sub>a</sub>) − a2·(ϑ<sub>m</sub>−ϑ<sub>a</sub>)² − a3·u·(ϑ<sub>m</sub>−ϑ<sub>a</sub>) + a4·(E<sub>L</sub>−σT<sub>a</sub>⁴) − a6·u·G<sub>hem</sub> − a8·(ϑ<sub>m</sub>−ϑ<sub>a</sub>)⁴]</b><br/>
-        <span style="font-size:11px;">ϑ<sub>m</sub> = (Tin + Tout)/2，iterated per hour. a3,a4,a6,a8 can be assumed as 0</span>
+      <b>η<sub>th</sub> = η<sub>0,hem</sub> − a1·(T<sub>m</sub>−T<sub>a</sub>)/G − a2·(T<sub>m</sub>−T<sub>a</sub>)²/G − a3·u·(T<sub>m</sub>−T<sub>a</sub>)/G + a4·(E<sub>L</sub>−σT<sub>a</sub>⁴)/G − a6·u·G<sub>hem</sub> − a8·(T<sub>m</sub>−T<sub>a</sub>)⁴/G</b><br/>
+      <span style="font-size:11px;">T<sub>m</sub> = (Tin + Tout)/2，iterated per hour. a3,a4,a6,a8 can be assumed as 0</span>
       </div>
       <div class="grid" style="margin:0;">
         <label for="isoEta0">η<sub>0,hem</sub> — peak efficiency:</label>
-        <input id="isoEta0" type="number" step="0.0001" value="0.627" />
+        <input id="isoEta0" type="number" step="0.0001" value="0.4" />
         <label for="isoA1">a1 — heat loss coeff (W/m²K):</label>
         <input id="isoA1" type="number" step="0.0001" value="10.49" />
         <label for="isoA2">a2 — temp² loss coeff (W/m²K²):</label>
@@ -118,9 +118,9 @@
         <label for="isoA3">a3 — wind×temp loss (J/m³K):</label>
         <input id="isoA3" type="number" step="0.00001" value="0" />
         <label for="isoA4">a4 — sky temp coeff (−):</label>
-        <input id="isoA4" type="number" step="0.00001" value="-0.008" />
+        <input id="isoA4" type="number" step="0.00001" value="0" />
         <label for="isoA6">a6 — wind×G coeff (s/m):</label>
-        <input id="isoA6" type="number" step="0.00001" value="0" />
+        <input id="isoA6" type="number" step="0.00001" value="-0.008" />
         <label for="isoA8">a8 — 4th order loss (W/m²K⁴):</label>
         <input id="isoA8" type="number" step="0.0000001" value="0" />
         <label for="isoTout0">Initial Tout guess (°C):</label>
